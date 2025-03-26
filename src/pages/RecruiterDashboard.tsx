@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { BsBuilding, BsCurrencyDollar, BsPencil, BsBriefcase,  BsSearch } from "react-icons/bs";
+import { BsBuilding, BsCurrencyDollar, BsPencil, BsBriefcase,  BsSearch,  BsFilter, BsList } from "react-icons/bs";
 import { HiOutlineDocumentText, HiOutlineUsers } from "react-icons/hi";
 import { FaWhatsapp } from "react-icons/fa";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { useLocation } from "react-router-dom";
+import { getInitialTheme, toggleTheme as toggleThemeUtil } from '@/components/theme';
 import { 
   getFirestore, 
   doc, 
@@ -107,16 +108,44 @@ export const RecruiterDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredDeveloperCandidates, setFilteredDevelopers] = useState<Candidate[]>([]);
   const [filteredInvestorApplications, setFilteredInvestors] = useState<InvestorApplication[]>([]);
+  const [sortOption, setSortOption] = useState<'newest' | 'oldest'>('newest');
+  const [experienceFilter, setExperienceFilter] = useState<'all' | '0-1' | '1-3' | '3-5' | '5+'>('all');
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>(getInitialTheme());
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
+  
   const handleViewCandidate = (candidate: Candidate) => {
     setSelectedCandidate(candidate);
     setShowCandidateDetails(true);
   };
 
+  const availableSkills = [
+    'Python', 'Java', 'JavaScript', 'Kotlin', 'Swift', 'C', 'C++', 'C#', 
+    'React', 'Angular', 'Vue', 'Node.js', 'Django', 'Flask', 'Spring'
+  ];
+
   const handleViewInvestorApplication = (application: InvestorApplication) => {
     setSelectedInvestorApplication(application);
     setShowInvestorApplicationDetails(true);
   };
+
+  const toggleTheme = () => {
+    const newTheme = toggleThemeUtil();
+    setTheme(newTheme);
+  };
+
+  // Replace your useEffect with:
+  useEffect(() => {
+    // This effect runs once on component mount
+    // Check the actual DOM state, which was set by the IIFE in theme.ts
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    setTheme(isDarkMode ? 'dark' : 'light');
+  }, []);
+
+  
 
   const handleUpdateApplicationStatus = async (candidateId: string, newStatus: 'accepted' | 'rejected') => {
     try {
@@ -196,6 +225,7 @@ export const RecruiterDashboard = () => {
             description: "User ID not found. Please try logging in again.",
             variant: "destructive"
           });
+          setLoading(false); // Important to set loading to false even on error
           return;
         }
 
@@ -422,12 +452,290 @@ export const RecruiterDashboard = () => {
     );
   }
 
+  const SideNavBar = ({ activeTab, setActiveTab, isSideMenuOpen, setIsSideMenuOpen, isFilterOpen, setIsFilterOpen }) => {
+    return (
+      <>
+        <style jsx>{`
+          .modern-scrollbar::-webkit-scrollbar {
+            width: 4px;
+          }
+          .modern-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .modern-scrollbar::-webkit-scrollbar-thumb {
+            background-color: transparent;
+            border-radius: 20px;
+            transition: background-color 0.3s ease;
+          }
+          .modern-scrollbar:hover::-webkit-scrollbar-thumb {
+            background-color: rgba(156, 163, 175, 0.5);
+          }
+          .modern-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(107, 114, 128, 0.7);
+          }
+          .dark .modern-scrollbar:hover::-webkit-scrollbar-thumb {
+            background-color: rgba(99, 102, 241, 0.5);
+          }
+          .dark .modern-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(99, 102, 241, 0.7);
+          }
+        `}</style>
+        <div className={`fixed top-16 left-0 h-[calc(100vh-4rem)] w-64 bg-white border border-gray-300 dark:bg-gray-900 dark:border-gray-700 shadow-lg z-50 transform transition-transform ${isSideMenuOpen ? 'translate-x-0' : '-translate-x-full'} sm:translate-x-0 overflow-hidden`}>
+          <div className="h-full overflow-y-auto modern-scrollbar">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent dark:from-green-500 dark:to-blue-500">
+                  Menu
+                </h2>
+                <button
+                  onClick={() => setIsSideMenuOpen(false)}
+                  className="text-gray-600 dark:text-gray-300 sm:hidden"
+                >
+                  <BsList className="h-6 w-6" />
+                </button>
+              </div>
+              <div className="mt-6 space-y-4">
+                <div className="flex flex-col space-y-2">
+                  {(['pending', 'reviewing', 'accepted', 'rejected'] as const).map((status) => (        
+                    <Button
+                      key={status}
+                      variant={activeTab === status ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setActiveTab(status)}
+                      className={`flex items-center justify-start px-3 py-2 capitalize transition-all duration-300 ${
+                        activeTab === status
+                          ? 'bg-primary hover:bg-primary/90 dark:bg-blue-600 shadow-md'
+                          : 'hover:bg-gray-100 text-gray-700 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200'
+                      }`}
+                    >
+                      <span>{status}</span>
+                      {activeTab === status && (
+                        <span className="ml-auto bg-white/20 px-1.5 py-0.5 rounded-full text-xs">
+                          {activeApplicationTab === 'developers' 
+                            ? filteredDeveloperCandidates.length 
+                            : filteredInvestorApplications.length}
+                        </span>
+                      )}
+                    </Button>
+                  ))}
+                </div>
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                    className="flex items-center justify-start w-full px-3 py-2 border-gray-300 dark:border-blue-400 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 transition-all duration-300"
+                  >
+                    <BsFilter className="h-4 w-4 mr-2" />
+                    <span>Filter</span>
+                  </Button>
+                  {isFilterOpen && (
+                    <div className="mt-2 w-full bg-white dark:bg-gray-800 border rounded-md shadow-lg py-2">
+                      <div className="px-4 py-2 text-sm font-semibold text-gray-500 dark:text-gray-200">Sort By</div>
+                      <div className="px-4 py-2">
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="sortOption"
+                            value="newest"
+                            checked={sortOption === 'newest'}
+                            onChange={() => setSortOption('newest')}
+                            className="form-radio"
+                          />
+                          <span className="ml-2 dark:text-gray-200">Newest</span>
+                        </label>
+                        <label className="flex items-center mt-2">
+                          <input
+                            type="radio"
+                            name="sortOption"
+                            value="oldest"
+                            checked={sortOption === 'oldest'}
+                            onChange={() => setSortOption('oldest')}
+                            className="form-radio"
+                          />
+                          <span className="ml-2 dark:text-gray-200">Oldest</span>
+                        </label>
+                      </div>
+                      
+                      <div className="px-4 py-2 text-sm font-semibold text-gray-500 dark:text-gray-200">Experience Range</div>
+                      <div className="px-4 py-2">
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="experienceFilter"
+                            value="all"
+                            checked={experienceFilter === 'all'}
+                            onChange={() => setExperienceFilter('all')}
+                            className="form-radio"
+                          />
+                          <span className="ml-2 dark:text-gray-200">All</span>
+                        </label>
+                        <label className="flex items-center mt-2">
+                          <input
+                            type="radio"
+                            name="experienceFilter"
+                            value="0-1"
+                            checked={experienceFilter === '0-1'}
+                            onChange={() => setExperienceFilter('0-1')}
+                            className="form-radio"
+                          />
+                          <span className="ml-2 dark:text-gray-200">0-1 years</span>
+                        </label>
+                        <label className="flex items-center mt-2">
+                          <input
+                            type="radio"
+                            name="experienceFilter"
+                            value="1-3"
+                            checked={experienceFilter === '1-3'}
+                            onChange={() => setExperienceFilter('1-3')}
+                            className="form-radio"
+                          />
+                          <span className="ml-2 dark:text-gray-200">1-3 years</span>
+                        </label>
+                        <label className="flex items-center mt-2">
+                          <input
+                            type="radio"
+                            name="experienceFilter"
+                            value="3-5"
+                            checked={experienceFilter === '3-5'}
+                            onChange={() => setExperienceFilter('3-5')}
+                            className="form-radio"
+                          />
+                          <span className="ml-2 dark:text-gray-200">3-5 years</span>
+                        </label>
+                        <label className="flex items-center mt-2">
+                          <input
+                            type="radio"
+                            name="experienceFilter"
+                            value="5+"
+                            checked={experienceFilter === '5+'}
+                            onChange={() => setExperienceFilter('5+')}
+                            className="form-radio"
+                          />
+                          <span className="ml-2 dark:text-gray-200">5+ years</span>
+                        </label>
+                      </div>
+                      
+                      <div className="px-4 py-2 text-sm font-semibold text-gray-500 dark:text-gray-200">Skills</div>
+                      <div className="px-4 py-2 max-h-40 overflow-y-auto">
+                        {availableSkills.map((skill) => (
+                          <label key={skill} className="flex items-center mt-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedSkills.includes(skill)}
+                              onChange={() => {
+                                if (selectedSkills.includes(skill)) {
+                                  setSelectedSkills(selectedSkills.filter(s => s !== skill));
+                                } else {
+                                  setSelectedSkills([...selectedSkills, skill]);
+                                }
+                              }}
+                              className="form-checkbox"
+                            />
+                            <span className="ml-2 dark:text-gray-200">{skill}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  // useEffect(() => {
+  //   const filteredByCriteria = developerCandidates.filter(candidate => {
+  //     // Filter by status
+  //     if (candidate.status !== activeTab) return false;
+      
+  //     // Filter by search query
+  //     if (searchQuery) {
+  //       const query = searchQuery.toLowerCase();
+  //       if (!candidate.name.toLowerCase().includes(query) && 
+  //           !candidate.skills.some(skill => skill.toLowerCase().includes(query))) {
+  //         return false;
+  //       }
+  //     }
+      
+  //     // Filter by experience
+  //     if (experienceFilter !== 'all') {
+  //       const exp = parseInt(candidate.experience);
+  //       if (experienceFilter === '0-1' && (exp < 0 || exp > 1)) return false;
+  //       if (experienceFilter === '1-3' && (exp < 1 || exp > 3)) return false;
+  //       if (experienceFilter === '3-5' && (exp < 3 || exp > 5)) return false;
+  //       if (experienceFilter === '5+' && exp < 5) return false;
+  //     }
+      
+  //     // Filter by skills
+  //     if (selectedSkills.length > 0) {
+  //       if (!selectedSkills.some(skill => candidate.skills.includes(skill))) {
+  //         return false;
+  //       }
+  //     }
+      
+  //     return true;
+  //   });
+    
+  //   // Sort by date
+  //   const sorted = [...filteredByCriteria].sort((a, b) => {
+  //     const dateA = new Date(a.appliedDate);
+  //     const dateB = new Date(b.appliedDate);
+  //     return sortOption === 'newest' ? dateB.getTime() - dateA.getTime() : dateA.getTime() - dateB.getTime();
+  //   });
+    
+  //   setFilteredDevelopers(sorted);
+  // }, [
+  //   developerCandidates, 
+  //   activeTab, 
+  //   searchQuery, 
+  //   experienceFilter, 
+  //   selectedSkills, 
+  //   sortOption
+  // ]);
+
   // const filteredDeveloperCandidates = developerCandidates.filter(candidate => candidate.status === activeTab);
   // const filteredInvestorApplications = investorApplications.filter(application => application.status === activeTab);
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* <Navbar /> */}
+      <Navbar 
+      theme={theme} 
+      setIsSideMenuOpen={setIsSideMenuOpen} 
+      searchQuery={searchQuery}
+      setSearchQuery={setSearchQuery}
+      profileElement={
+        <button
+          onClick={() => setIsProfileOpen(true)}
+          className="flex items-center justify-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 transition-colors duration-200 ml-2"
+        >
+          <img 
+            src={profile?.photoURL} 
+            alt="Profile" 
+            className="h-10 w-10 rounded-full border-2 border-gray-300 dark:border-blue-400" 
+          />
+        </button>
+      }
+    />
+    
+    <SideNavBar
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      isSideMenuOpen={isSideMenuOpen}
+      setIsSideMenuOpen={setIsSideMenuOpen}
+      isFilterOpen={isFilterOpen}
+      setIsFilterOpen={setIsFilterOpen}
+    />
+    
+    {isSideMenuOpen && (
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden"
+        onClick={() => setIsSideMenuOpen(false)}
+      ></div>
+    )}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
